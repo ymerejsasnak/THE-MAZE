@@ -1,10 +1,12 @@
 import pygame
 import maze as m
+import sidebar as sb
+import inventory as i
 
 
 # constants for screen size and areas of screen
 SIDEBAR_WIDTH = 400
-SCR_HEIGHT = SIDE_BAR_POSITION = MAZE_SIZE = 820
+SCR_HEIGHT = SIDEBAR_POSITION = MAZE_SIZE = 820
 SCR_WIDTH = SIDEBAR_WIDTH + MAZE_SIZE
 
 NORTH = (0, -1)
@@ -25,31 +27,44 @@ def run_game():
     
     
     # temp -
-    difficulty = 'normal'
+    difficulty = 'easy'
     
-    maze = m.Maze(difficulty)
+    
+    inventory = i.Inventory()
+    
+    maze = m.Maze(difficulty, inventory)
     maze.draw(screen)
+        
+    sidebar = sb.Sidebar()
+    sidebar.draw(screen, inventory.items())
+    
     
     
     # Start the main loop for the game.
     while running:
     
-    
+        # simple way to slow game down, keep fps at max value in clock.tick
+        clock = pygame.time.Clock()
+        clock.tick(30)
     
         pygame.event.get()
         keys = pygame.key.get_pressed()
         if keys[pygame.K_UP]:
             maze.move(NORTH)
             maze.draw(screen)
+            sidebar.draw(screen, inventory.items())
         elif keys[pygame.K_DOWN]:
             maze.move(SOUTH)
             maze.draw(screen)
+            sidebar.draw(screen, inventory.items())
         elif keys[pygame.K_LEFT]:
             maze.move(WEST)
             maze.draw(screen)
+            sidebar.draw(screen, inventory.items())
         elif keys[pygame.K_RIGHT]:
             maze.move(EAST)
             maze.draw(screen)
+            sidebar.draw(screen, inventory.items())
         elif keys[pygame.K_ESCAPE]:
             running = False
         

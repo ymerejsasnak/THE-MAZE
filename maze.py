@@ -19,16 +19,31 @@ PLAYER_COLOR = (100, 200, 0)
 WALL_COLOR = pygame.Color(100, 50, 0)
 FLOOR_COLOR = pygame.Color(230, 230, 200)
 FINISH_COLOR = pygame.Color(100, 100, 200)
+PAINTED_COLOR = pygame.Color(200, 200, 250)
+ROBOT_PATH_COLOR = pygame.Color(200, 255, 230)
 SHADOW_COLOR = pygame.Color(30, 30, 30)
 
+PAINTCAN_COLOR = pygame.Color(150, 150, 250)
+FUEL_COLOR = pygame.Color(50, 150, 50)
+CHARGE_COLOR = pygame.Color(255, 255, 50)
+
+OUTLINE_COLOR = (0, 0, 0)
+
+ITEM_SIZE = 7
+
 START_SIGHT_RANGE = 1  # see clearly for 1 space, fade out after that
-MAX_SIGHT_RANGE = 10   # not sure if this is a good max value or not
+MAX_FUEL_LEVEL = 10
 
 # for use in creation of maze and as keys in cells dictionary
 WALL = '#'
 HALL = '.'
 
-FINISH = 'F'
+FINISH = 0
+
+PAINT = 1
+FUEL = 2
+CHARGE = 3
+
 
 
 # --------------------------
@@ -42,8 +57,9 @@ def distance(x1, y1, x2, y2):
     
 class Maze:
     
-    def __init__(self, difficulty):
+    def __init__(self, difficulty, inventory):
         self.cells = {}
+        self.inventory = inventory
         self.sight_range = START_SIGHT_RANGE
                 
         self.grid_size = GRID_SIZE[difficulty]
@@ -105,6 +121,14 @@ class Maze:
         # don't forget to add the finish space, place it in one of the 4 corners randomly
         finish_position = (r.choice([1, self.grid_size - 2]), r.choice([1, self.grid_size - 2]))
         self.cells[finish_position] = FINISH
+        
+        # populate maze with items:  (temp numbers fornow)
+        for x in range(100):
+            x_pos = r.randrange(self.grid_size) 
+            y_pos = r.randrange(self.grid_size)
+            if (x_pos, y_pos) == finish_position or self.cells[(x_pos, y_pos)] == WALL: 
+                continue
+            self.cells[(x_pos, y_pos)] = r.choice([PAINT, PAINT, PAINT, FUEL, FUEL, CHARGE])
 
     def draw(self, screen):
         for x in range(-VIEW_RANGE // 2, VIEW_RANGE // 2 + 1):
@@ -133,17 +157,51 @@ class Maze:
                 for i in range(fadeout):
                     color -= SHADOW_COLOR # cuz subtracting multiply of color object didn't work??
                  
-                # now draw map!
+                # now draw the cell!
                 size = CELL_SIZE  # just so I had to type less
                 pygame.draw.rect(screen, color, (draw_pos[0] * size, draw_pos[1] * size, size, size))
         
+                item = False
+                # draw items same way
+                if contents == PAINT:
+                    item_color = PAINTCAN_COLOR
+                    item = True
+                elif contents == FUEL:
+                    item_color = FUEL_COLOR   
+                    item = True                 
+                elif contents == CHARGE:
+                    item_color = CHARGE_COLOR
+                    item = True
+                
+                if item:    
+                    for i in range(fadeout * 2):
+                        item_color -= SHADOW_COLOR
+                    pygame.draw.circle(screen, item_color, (draw_pos[0] * size + size // 2, 
+                                        draw_pos[1] * size + size // 2), ITEM_SIZE)
+                    pygame.draw.circle(screen, OUTLINE_COLOR, (draw_pos[0] * size + size // 2, 
+                                        draw_pos[1] * size + size // 2), ITEM_SIZE, 1)
+        
+        
         # and after map drawn, draw player!
         pygame.draw.circle(screen, PLAYER_COLOR, PLAYER_DRAW_POSITION, PLAYER_RADIUS)
+        pygame.draw.circle(screen, OUTLINE_COLOR, PLAYER_DRAW_POSITION, PLAYER_RADIUS, 1)
+  
   
     def move(self, direction):
         target = (self.player_position[0] + direction[0], self.player_position[1] + direction[1])
         if self.cells[target] != WALL:
             self.player_position = target
+        
+        if self.cells[target] == FUEL:
+            self.cells[target] = HALL
+            self.inventory.get_fuel()
+            self.sight_range = min(self.sight_range + 1, MAX_FUEL_LEVEL)
+        elif self.cells[target] == PAINT:
+            self.cells[target] = HALL
+            self.inventory.get_paint()
+        elif self.cells[target] == CHARGE:
+            self.cells[target] = HALL
+            self.inventory.get_charge()
             
             
             
