@@ -3,8 +3,8 @@ import maze as m
 
 
 # constants for screen size and areas of screen
-SIDEBAR_WIDTH = 300
-SCR_HEIGHT = MAZE_SIZE = 820
+SIDEBAR_WIDTH = 400
+SCR_HEIGHT = SIDE_BAR_POSITION = MAZE_SIZE = 820
 SCR_WIDTH = SIDEBAR_WIDTH + MAZE_SIZE
 
 NORTH = (0, -1)
@@ -12,8 +12,7 @@ SOUTH = (0, 1)
 EAST = (1, 0)
 WEST = (-1, 0)
 
-# temp -
-difficulty = 'easy'
+
 
 
 def run_game():
@@ -24,6 +23,9 @@ def run_game():
     
     running = True
     
+    
+    # temp -
+    difficulty = 'normal'
     
     maze = m.Maze(difficulty)
     maze.draw(screen)
