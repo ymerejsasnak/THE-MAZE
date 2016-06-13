@@ -23,7 +23,7 @@ BOX_X_POSITION = SIDEBAR_WIDTH // 8 + SIDEBAR_POSITION
 class Sidebar:    
 
     def draw(self, screen, items):
-        fuel, paint, charges = items
+        fuel, paint, magic_paint, pickaxes = items
         # background
         color = BG_COLOR
         for x in range(0, SIDEBAR_WIDTH, FADE_WIDTH):
@@ -31,7 +31,8 @@ class Sidebar:
             color -= FADE
         self.draw_box(screen, BOX_SPACING, text='Lantern Fuel:           ' + str(fuel))
         self.draw_box(screen, BOX_HEIGHT + BOX_SPACING * 2, text='Paint:                        ' + str(paint))
-        self.draw_box(screen, BOX_HEIGHT * 2 + BOX_SPACING * 3, text='Battery Charges:     ' + str(charges)) 
+        self.draw_box(screen, BOX_HEIGHT * 2 + BOX_SPACING * 3, text='Magic Paint:             ' + str(magic_paint))
+        self.draw_box(screen, BOX_HEIGHT * 3 + BOX_SPACING * 4, text='Pickaxes:                ' + str(pickaxes)) 
             
     
     def draw_box(self, screen, y_pos, text=''):

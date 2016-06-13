@@ -1,10 +1,10 @@
 import random as r
 import pygame
 import sys
-
+import magic_paint as mp
 
 # grid size is # of cells, must be odd number for maze to look right
-GRID_SIZE = {'test': 11, 'easy': 31, 'normal': 103, 'hard': 303}
+GRID_SIZE = {'test': 11, 'easy': 51, 'normal': 203, 'hard': 303}
 CELL_SIZE = 20  # pixels (h and w) per each grid cell
 MAZE_SIZE = 820  # pixel size (h and w) of maze portion of screen
 
@@ -17,33 +17,39 @@ PLAYER_RADIUS = CELL_SIZE // 2
 PLAYER_COLOR = (100, 200, 0)
 
 WALL_COLOR = pygame.Color(100, 50, 0)
-FLOOR_COLOR = pygame.Color(230, 230, 200)
+OUTER_WALL_COLOR = pygame.Color(50, 25, 0)
+FLOOR_COLOR = pygame.Color(200, 200, 150)
 FINISH_COLOR = pygame.Color(100, 100, 200)
-PAINTED_COLOR = pygame.Color(200, 200, 250)
-ROBOT_PATH_COLOR = pygame.Color(200, 255, 230)
+PAINTED_COLOR = pygame.Color(255, 180, 180)
+MAGIC_PATH_COLOR = pygame.Color(200, 255, 230)
 SHADOW_COLOR = pygame.Color(30, 30, 30)
 
-PAINTCAN_COLOR = pygame.Color(150, 150, 250)
+PAINTCAN_COLOR = pygame.Color(250, 150, 150)
 FUEL_COLOR = pygame.Color(50, 150, 50)
-CHARGE_COLOR = pygame.Color(255, 255, 50)
+MAGIC_PAINTCAN_COLOR = MAGIC_PATH_COLOR
+PICKAXE_COLOR = WALL_COLOR
 
 OUTLINE_COLOR = (0, 0, 0)
 
 ITEM_SIZE = 7
 
 START_SIGHT_RANGE = 1  # see clearly for 1 space, fade out after that
-MAX_FUEL_LEVEL = 10
+MAX_FUEL_LEVEL = 15
 
 # for use in creation of maze and as keys in cells dictionary
 WALL = '#'
 HALL = '.'
 
-FINISH = 0
-
 PAINT = 1
 FUEL = 2
-CHARGE = 3
+MAGIC_PAINT = 3
+PICKAXE = 4
 
+FINISH = 5
+PAINTED = 6
+MAGIC_PATH = 7
+
+OUTER_WALL = 0
 
 
 # --------------------------
@@ -63,8 +69,10 @@ class Maze:
         self.sight_range = START_SIGHT_RANGE
                 
         self.grid_size = GRID_SIZE[difficulty]
+        self.facing = None
         
         self.player_position = (self.grid_size // 2, self.grid_size // 2)
+        self.facing = None
         
         # need a value floor half of grid size because of the way maze is generated
         # (works on two grid cells at a time because of the need of walls between spaces)
@@ -119,16 +127,16 @@ class Maze:
                     self.cells[(x, y)] = maze[y][x]
                     
         # don't forget to add the finish space, place it in one of the 4 corners randomly
-        finish_position = (r.choice([1, self.grid_size - 2]), r.choice([1, self.grid_size - 2]))
-        self.cells[finish_position] = FINISH
+        self.finish_position = (r.choice([1, self.grid_size - 2]), r.choice([1, self.grid_size - 2]))
+        self.cells[self.finish_position] = FINISH
         
         # populate maze with items:  (temp numbers fornow)
-        for x in range(100):
+        for x in range(500):
             x_pos = r.randrange(self.grid_size) 
             y_pos = r.randrange(self.grid_size)
-            if (x_pos, y_pos) == finish_position or self.cells[(x_pos, y_pos)] == WALL: 
+            if (x_pos, y_pos) == self.finish_position or self.cells[(x_pos, y_pos)] == WALL: 
                 continue
-            self.cells[(x_pos, y_pos)] = r.choice([PAINT, PAINT, PAINT, FUEL, FUEL, CHARGE])
+            self.cells[(x_pos, y_pos)] = r.choice([PAINT, FUEL, MAGIC_PAINT, PICKAXE])
 
     def draw(self, screen):
         for x in range(-VIEW_RANGE // 2, VIEW_RANGE // 2 + 1):
@@ -136,21 +144,22 @@ class Maze:
                                 
                 draw_pos = (CENTER + x, CENTER + y)
                 
-                # using mod to fake a toroidal look (so player never knows when on edge)
-                wrap_maze_pos = ((self.player_position[0] + x) % (self.grid_size - 1), 
-                                (self.player_position[1] + y) % (self.grid_size - 1)) 
-                wrap_contents = self.cells.get(wrap_maze_pos, WALL)
+                # note: removed toroidal drawing of maze
                 
-                if wrap_contents == WALL:
-                    color = WALL_COLOR
-                else:
-                    color = FLOOR_COLOR  
-                 
-                # do again, but non-toroidally, for certain items and finish
                 maze_pos = (self.player_position[0] + x, self.player_position[1] + y) 
-                contents = self.cells.get(maze_pos)
-                if contents == FINISH:
+                contents = self.cells.get(maze_pos, OUTER_WALL)
+                if contents == WALL:
+                    color = WALL_COLOR
+                elif contents == OUTER_WALL:
+                    color = OUTER_WALL_COLOR
+                elif contents == FINISH:
                     color = FINISH_COLOR
+                elif contents == PAINTED:
+                    color = PAINTED_COLOR
+                elif contents == MAGIC_PATH:
+                    color = MAGIC_PATH_COLOR
+                else:
+                    color = FLOOR_COLOR
                     
                 # calculate and apply shadows
                 fadeout = int(distance(draw_pos[0], draw_pos[1], CENTER, CENTER) - self.sight_range)
@@ -169,8 +178,11 @@ class Maze:
                 elif contents == FUEL:
                     item_color = FUEL_COLOR   
                     item = True                 
-                elif contents == CHARGE:
-                    item_color = CHARGE_COLOR
+                elif contents == MAGIC_PAINT:
+                    item_color = MAGIC_PAINTCAN_COLOR
+                    item = True
+                elif contents == PICKAXE:
+                    item_color = PICKAXE_COLOR
                     item = True
                 
                 if item:    
@@ -187,10 +199,12 @@ class Maze:
         pygame.draw.circle(screen, OUTLINE_COLOR, PLAYER_DRAW_POSITION, PLAYER_RADIUS, 1)
   
   
-    def move(self, direction):
+    def move(self, direction, sound_obj):
+        self.facing = direction # save direction for pickaxe use
         target = (self.player_position[0] + direction[0], self.player_position[1] + direction[1])
         if self.cells[target] != WALL:
             self.player_position = target
+            sound_obj.play_step()
         
         if self.cells[target] == FUEL:
             self.cells[target] = HALL
@@ -199,13 +213,45 @@ class Maze:
         elif self.cells[target] == PAINT:
             self.cells[target] = HALL
             self.inventory.get_paint()
-        elif self.cells[target] == CHARGE:
+        elif self.cells[target] == MAGIC_PAINT:
             self.cells[target] = HALL
-            self.inventory.get_charge()
+            self.inventory.get_magic_paint()
+        elif self.cells[target] == PICKAXE:
+            self.cells[target] = HALL
+            self.inventory.get_pickaxe()
             
             
-            
-'''            
+    def paint(self):
+        contents = self.cells[self.player_position]
+        if self.inventory.paint < 1 or contents == PAINTED or contents == FINISH:
+            return
+        self.inventory.paint -= 1
+        self.cells[self.player_position] = PAINTED
+    
+    
+    def magic_paint(self):
+        magic = self.inventory.magic_paint
+        if magic < 1:
+            return
+        a_star_result = mp.a_star_search(self, self.player_position, self.finish_position)
+        path = mp.reconstruct_path(a_star_result, self.player_position, self.finish_position)
+        for cell in path[1:magic + 1]:
+            if self.cells[cell] == HALL:
+                self.cells[cell] = MAGIC_PATH
+                self.inventory.magic_paint -= 1
+            else: # exits paint loop if hits an item/finish
+                return
+    
+    def pickaxe(self):
+        if self.inventory.pickaxes == 0:
+            return
+        target = (self.player_position[0] + self.facing[0], self.player_position[1] + self.facing[1])
+        if 0 < target[0] < self.grid_size - 1 and 0 < target[1] < self.grid_size - 1 and self.cells[target] == WALL:
+            self.cells[target] = HALL
+            self.inventory.pickaxes -= 1    
+        
+        
+        
     def neighbors(self, current):
         x, y = current
         neighbors = []
@@ -219,12 +265,4 @@ class Maze:
         
         return neighbors
         
-
-
-# get total 'manhattan' distance between two points
-def heuristic(a, b):
-    (x1, y1) = a
-    (x2, y2) = b
-    return abs(x1 - x2) + abs(y1 - y2)
-'''
-
+            
